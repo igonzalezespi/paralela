@@ -1,5 +1,9 @@
 {
   "files.associations": {
     "stdio.h": "c"
+  },
+  "files.exclude": {
+    ".vscode": true,
+    "**/*.compiled": true
   }
 }
