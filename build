@@ -1,0 +1,5 @@
+#!/bin/bash
+echo g++ -fopenmp ./$1.c -o ./$1
+echo
+g++ -fopenmp ./$1.c -o ./$1
+./$1

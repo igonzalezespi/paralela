@@ -1,0 +1,14 @@
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+
+	#pragma omp parallel
+	{
+		printf("hola mundo parallel2\n");
+	}
+
+	return 0;
+}
+printf ("Enter a word: ");
+  scanf ("%s", a_word);
