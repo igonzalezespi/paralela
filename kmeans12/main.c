@@ -111,7 +111,7 @@ int main( int argc, char **argv ) {
 
     double fin = omp_get_wtime();
 
-    //cluster_diag (columns, rows, clusters, dataSetMatrix, clustering_output, cluster_centroid);
+    cluster_diag (columns, rows, clusters, dataSetMatrix, clustering_output, cluster_centroid);
 
     printf ("%.3lf\n", fin-ini);
     //Free memory
