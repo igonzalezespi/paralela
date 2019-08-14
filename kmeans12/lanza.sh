@@ -16,9 +16,9 @@ do
     do 
         for c in ${clusters[@]}
         do
-            echo fichero:$input iterations:$i clusters $c
+            # echo fichero:$input iterations:$i clusters $c
 
-           ./run -f DataSetAlu/$input -i $i -c $c
+           ./run -f $input -i $i -c $c
         done
     done
 done 
