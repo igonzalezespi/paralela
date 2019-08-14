@@ -113,7 +113,7 @@ int main( int argc, char **argv ) {
 
     cluster_diag (columns, rows, clusters, dataSetMatrix, clustering_output, cluster_centroid);
 
-    printf ("%.3lf\n", fin-ini);
+    // printf ("%.3lf\n", fin-ini);
     //Free memory
     free (dataSetMatrix);
     free (cluster_centroid);
