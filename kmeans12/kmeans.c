@@ -139,7 +139,6 @@ void calc_cluster_centroidsOMP(int dim, int n, int k, float *X,
   float *P_new_cluster_centroid = (float *)malloc(k * dim * sizeof(float));
   int *P_cluster_member_count = (int *)malloc(k * sizeof(float));
 
-#pragma omp parallel for schedule(static) num_threads(2)
   for (int i = 0; i < k; i++) {
     P_cluster_member_count[i] = 0;
     for (int j = 0; j < dim; j++) {
@@ -151,7 +150,7 @@ void calc_cluster_centroidsOMP(int dim, int n, int k, float *X,
     // which cluster is it in?
     int active_cluster = cluster_assignment_index[i];
 
-// update count of members in that cluster
+    // update count of members in that cluster
     P_cluster_member_count[active_cluster]++;
 
     // sum point coordinates for finding centroid
