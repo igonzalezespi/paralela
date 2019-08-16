@@ -123,9 +123,8 @@ void calc_cluster_centroidsOMP(int dim, int n, int k, float *X,
                                int *cluster_assignment_index,
                                float *new_cluster_centroid) {
   xini = omp_get_wtime();
-  int *cluster_member_count = (int *)malloc(k * sizeof(float));
+  int *cluster_member_count = (int *)malloc(k * sizeof(int));
 
-#pragma omp parallel for schedule(static) num_threads(2)
   for (int i = 0; i < k; ++i) {
     // initialize cluster centroid coordinate sums to zero
     cluster_member_count[i] = 0;
@@ -135,51 +134,53 @@ void calc_cluster_centroidsOMP(int dim, int n, int k, float *X,
     }
   }
 
-  // sum all points for every point
-  float *P_new_cluster_centroid = (float *)malloc(k * dim * sizeof(float));
-  int *P_cluster_member_count = (int *)malloc(k * sizeof(float));
+#pragma omp parallel num_threads(2)
+  {
+    int threadnum = omp_get_thread_num();
+    int numthreads = omp_get_num_threads();
+    int alto;
+    int bajo;
 
-  for (int i = 0; i < k; i++) {
-    P_cluster_member_count[i] = 0;
-    for (int j = 0; j < dim; j++) {
-      P_new_cluster_centroid[i * dim + j] = 0;
+    // sum all points for every point
+    float *P_new_cluster_centroid = (float *)malloc(k * dim * sizeof(float));
+    int *P_cluster_member_count = (int *)malloc(k * sizeof(float));
+
+    for (int i = 0; i < k; i++) {
+      P_cluster_member_count[i] = 0;
+      for (int j = 0; j < dim; j++) {
+        P_new_cluster_centroid[i * dim + j] = 0;
+      }
     }
+
+    bajo = n * threadnum / numthreads;
+    alto = n * (threadnum + 1) / numthreads;
+    for (int i = bajo; i < alto; i++) {
+      int active_cluster = cluster_assignment_index[i];
+      P_cluster_member_count[active_cluster]++;
+
+      for (int j = 0; j < dim; j++) {
+        P_new_cluster_centroid[active_cluster * dim + j] += X[i * dim + j];
+      }
+    }
+
+#pragma omp critical
+    {
+      for (int i = 0; i < k; i++) {
+        cluster_member_count[i] += P_cluster_member_count[i];
+        for (int j = 0; j < dim; j++) {
+          new_cluster_centroid[i * dim + j] +=
+              P_new_cluster_centroid[i * dim + j];
+        }
+      }
+    }
+    free(P_cluster_member_count);
+    free(P_new_cluster_centroid);
   }
 
-  for (int i = 0; i < n; i++) {
-    // which cluster is it in?
-    int active_cluster = cluster_assignment_index[i];
-
-    // update count of members in that cluster
-    P_cluster_member_count[active_cluster]++;
-
-    // sum point coordinates for finding centroid
-    for (int j = 0; j < dim; j++) {
-      P_new_cluster_centroid[active_cluster * dim + j] += X[i * dim + j];
-    }
-  }
-
-  for (int i = 0; i < k; i++) {
-    cluster_member_count[i] += P_cluster_member_count[i];
-
-    for (int j = 0; j < dim; j++) {
-      new_cluster_centroid[i * dim + j] += P_new_cluster_centroid[i * dim + j];
-    }
-  }
-
-  free(P_cluster_member_count);
-  free(P_new_cluster_centroid);
-
-  // now divide each coordinate sum by number of members to find mean/centroid
-  // for each cluster
   for (int i = 0; i < k; ++i) {
-    if (cluster_member_count[i] == 0) break;  // Empy Cluster
-
-    // for each dimension
-    for (int j = 0; j < dim; j++) {
-      new_cluster_centroid[i * dim + j] /=
-          cluster_member_count[i];  /// XXXX will divide by zero here for any
-                                    /// empty clusters!
+    if (cluster_member_count[i] != 0) {
+      for (int j = 0; j < dim; j++)
+        new_cluster_centroid[i * dim + j] /= cluster_member_count[i];
     }
   }
   xfin = omp_get_wtime();

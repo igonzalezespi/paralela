@@ -5,5 +5,5 @@ make >/dev/null
 
 for i in {1..4}
 do
-  ./run -f ./DataSet/datosMascados.txt -i 20000 -c 8
+  ./run -f ./DataSet/datosMascados.txt -i 10000 -c 8
 done
