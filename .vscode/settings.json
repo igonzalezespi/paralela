@@ -1,6 +1,7 @@
 {
   "files.associations": {
-    "stdio.h": "c"
+    "stdio.h": "c",
+    "*.cu": "cpp"
   },
   "files.exclude": {
     ".vscode": true,

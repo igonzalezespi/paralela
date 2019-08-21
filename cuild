@@ -1,0 +1,5 @@
+#!/bin/bash
+echo nvcc ./$1.cu -o ./$1.compiled
+echo
+nvcc ./$1.cu -o ./$1.compiled
+./$1.compiled
