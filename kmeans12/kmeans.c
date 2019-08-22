@@ -1,120 +1,85 @@
-//************************** kmeans.c ***************************
-//*******************Developed by José M. Cecilia*******************
-//************************* October 2018************************
-
 #include "kmeans.h"
+#define wtime omp_get_wtime
 
-double xini;
-double xfin;
-double xtime = 0;
+int randomOMP[256] =
+    {  // Datos pregenerados para que de el mismo resultado en OMP y CUDA
+        219523, 10350,  46213,  232555, 170597, 60743,  170306, 154400, 181297,
+        79121,  146366, 8043,   50882,  232179, 46147,  133302, 112968, 49690,
+        182904, 78028,  95443,  100820, 121511, 118453, 40826,  232730, 162042,
+        56607,  136199, 51455,  182481, 61914,  61806,  173994, 661,    177703,
+        234737, 170968, 38295,  176926, 195389, 184661, 130269, 7163,   123032,
+        121717, 85766,  236000, 116707, 29562,  20221,  212150, 75683,  141732,
+        91496,  116509, 80654,  198838, 173116, 162153, 11185,  116489, 224068,
+        72991,  235784, 170029, 195994, 231413, 47189,  234289, 114532, 187879,
+        125142, 5693,   195042, 9067,   72710,  226108, 190367, 189418, 200971,
+        155888, 162460, 37546,  58512,  199256, 99355,  139167, 158986, 33363,
+        62212,  170172, 95152,  231580, 188463, 91828,  107802, 145350, 29434,
+        154991, 85831,  89266,  103762, 210974, 40259,  4997,   165341, 112970,
+        176405, 61900,  63280,  83568,  217789, 171040, 66414,  221601, 131189,
+        165769, 66960,  51067,  144432, 74473,  166539, 477,    66945,  115895,
+        37605,  120047, 206545, 12339,  220339, 237676, 101605, 30293,  154842,
+        141865, 219698, 81075,  200135, 156996, 88276,  24307,  185864, 66957,
+        140647, 13171,  49450,  32728,  178940, 116411, 29096,  84265,  136184,
+        140935, 30042,  148429, 202130, 12947,  29369,  169567, 25287,  10600,
+        113436, 72192,  40893,  29170,  214057, 205892, 110246, 120384, 123780,
+        143822, 89991,  70536,  210779, 230639, 29007,  205529, 24259,  207948,
+        28132,  237763, 237513, 164316, 139591, 212855, 73638,  102613, 225802,
+        103007, 217481, 11981,  58907,  91809,  29474,  45100,  120979, 4423,
+        11884,  176525, 124808, 80964,  81239,  214799, 96801,  237318, 151630,
+        125808, 203740, 121190, 39948,  177172, 119845, 222761, 102381, 204736,
+        196508, 121319, 13542,  183203, 169626, 231023, 140484, 228533, 29024,
+        169958, 218933, 95303,  119682, 176118, 32721,  189790, 202382, 59260,
+        110781, 5375,   2771,   23304,  131184, 151811, 144494, 116432, 89875,
+        209639, 100086, 137556, 175268, 2786,   19767,  188810, 185989, 189393,
+        126025, 32666,  124118, 155049};
 
 void fail(const char *str) {
   fprintf(stderr, "%s", str);
   exit(-1);
 }
 
-/**
- * calc_distance calculates the distance between a given point and a cluster
- * @param int -dim: number of columns (variables) in the data set to be
- * classified
- * @param float * -: first arrray to calculate de distance
- * @param float * -: Second array to calculate de distance
- * @return float: Euclidean distance of two vectors
- */
 float calc_distance(int dim, float *p1, float *p2) {
-  float distance_sq_sum = 0;
-
-  // No se debe paralelizar porque se llama desde otra función en un bucle que
-  for (int i = 0; i < dim; ++i)
-    distance_sq_sum += (p1[i] - p2[i]) * (p1[i] - p2[i]);
-
+  float distance_sq_sum = 0.0f;
+  for (int i = 0; i < dim; ++i) distance_sq_sum += sqr(p1[i] - p2[i]);
   return distance_sq_sum;
 }
 
-/**
- * calc_all_distances computes the euclidean distances between centros ids and
- * dataset points.
- * @param int -dim: number of columns (variables) in the data set to be
- * classified
- * @param int -n: number of rows (points) in the data set to be classified
- * @param int -k: number of clusters to be calculated
- * @param float * -X: dataset to be classified
- * @param float * -centroid: prototypes of each cluster.
- * @param float * -distance_output[n][k] contains the distance between all
- * elements * in the dataset and all clusters return void
- */
 void calc_all_distances(int dim, int n, int k, float *X, float *centroid,
                         float *distance_output) {
-#pragma omp parallel for schedule(static) num_threads(2)
+#pragma omp parallel for schedule(static)
   for (int i = 0; i < n; ++i)
     for (int j = 0; j < k; ++j)
       distance_output[i * k + j] =
           calc_distance(dim, &X[i * dim], &centroid[j * dim]);
 }
 
-/**
- * calc_total_distance calculates the clustering overall distance.
- * @param int -dim: number of columns (variables) in the data set to be
- * classified
- * @param int -n: number of rows (points) in the data set to be classified
- * @param int -k: number of clusters to be calculated
- * @param float * -X: dataset to be classified
- * @param float * -centroid: prototypes of each cluster.
- * @param int * - cluster_assignment_index: current cluster assignment to each
- * point
- * @return float overall distance. This is what the algorithm tried to minimize
- */
 float calc_total_distance(int dim, int n, int k, float *X, float *centroids,
                           int *cluster_assignment_index) {
-  // NOTE: a point with cluster assignment -1 is ignored
   float tot_D = 0;
-
-#pragma omp parallel for schedule(static) reduction(+ : tot_D) num_threads(2)
-  for (int i = 0; i < n; ++i) {  // for every point
-    // which cluster is it in?
+#pragma omp parallel for schedule(static) reduction(+ : tot_D)
+  for (int i = 0; i < n; ++i) {
     int active_cluster = cluster_assignment_index[i];
-
-    // sum distance
     if (active_cluster != -1)
       tot_D +=
           calc_distance(dim, &X[i * dim], &centroids[active_cluster * dim]);
   }
-
   return tot_D;
 }
 
-/**
- * choose_all_clusters_from_distances obtains the closest cluster for each
- * point.
- * @param int -dim: number of columns (variables) in the data set to be
- * classified
- * @param int -n: number of rows (points) in the data set to be classified
- * @param int -k: number of clusters to be calculated
- * @param float * -distance_array[n][k] contains the distance between all
- * elements * in the dataset and all clusters
- * @param int* - cluster_assignment_index contains the assigned cluster to each
- * point
- * @return void
- */
 void choose_all_clusters_from_distances(int dim, int n, int k,
                                         float *distance_array,
                                         int *cluster_assignment_index) {
-#pragma omp parallel for schedule(static) num_threads(4)
-  for (int i = 0; i < n; ++i) {  // for each point
+#pragma omp parallel for schedule(static)
+  for (int i = 0; i < n; ++i) {
     int best_index = -1;
     float closest_distance = (__builtin_inff());
-
-    // for each cluster
     for (int j = 0; j < k; j++) {
-      // distance between point and cluster centroid
       float cur_distance = distance_array[i * k + j];
       if (cur_distance < closest_distance) {
         best_index = j;
         closest_distance = cur_distance;
       }
     }
-
-    // record in array
     cluster_assignment_index[i] = best_index;
   }
 }
@@ -122,26 +87,19 @@ void choose_all_clusters_from_distances(int dim, int n, int k,
 void calc_cluster_centroidsOMP(int dim, int n, int k, float *X,
                                int *cluster_assignment_index,
                                float *new_cluster_centroid) {
-  xini = omp_get_wtime();
   int *cluster_member_count = (int *)malloc(k * sizeof(int));
-
   for (int i = 0; i < k; ++i) {
-    // initialize cluster centroid coordinate sums to zero
     cluster_member_count[i] = 0;
-
-    for (int j = 0; j < dim; ++j) {
-      new_cluster_centroid[i * dim + j] = 0;
-    }
+    for (int j = 0; j < dim; ++j) new_cluster_centroid[i * dim + j] = 0;
   }
 
-#pragma omp parallel num_threads(2)
+#pragma omp parallel
   {
     int threadnum = omp_get_thread_num();
     int numthreads = omp_get_num_threads();
     int alto;
     int bajo;
 
-    // sum all points for every point
     float *P_new_cluster_centroid = (float *)malloc(k * dim * sizeof(float));
     int *P_cluster_member_count = (int *)malloc(k * sizeof(float));
 
@@ -167,107 +125,28 @@ void calc_cluster_centroidsOMP(int dim, int n, int k, float *X,
     {
       for (int i = 0; i < k; i++) {
         cluster_member_count[i] += P_cluster_member_count[i];
-        for (int j = 0; j < dim; j++) {
+        for (int j = 0; j < dim; j++)
           new_cluster_centroid[i * dim + j] +=
               P_new_cluster_centroid[i * dim + j];
-        }
       }
     }
     free(P_cluster_member_count);
     free(P_new_cluster_centroid);
   }
 
-  for (int i = 0; i < k; ++i) {
-    if (cluster_member_count[i] != 0) {
+  for (int i = 0; i < k; ++i)
+    if (cluster_member_count[i] != 0)
       for (int j = 0; j < dim; j++)
         new_cluster_centroid[i * dim + j] /= cluster_member_count[i];
-    }
-  }
-  xfin = omp_get_wtime();
-  xtime += xfin - xini;
 }
 
-/**
- * calc_cluster_centroids calculates the new prototypes of all clusters
- * @param int -dim: number of columns (variables) in the data set to be
- * classified
- * @param int -n: number of rows (points) in the data set to be classified
- * @param int -k: number of clusters to be calculated
- * @param float * -X: dataset to be classified
- * @param int * - cluster_assigment_index:
- * @param float * -new_cluster_centroid: it is the output with the new cluster
- * prototypes
- */
-
-void calc_cluster_centroids(int dim, int n, int k, float *X,
-                            int *cluster_assignment_index,
-                            float *new_cluster_centroid) {
-  int *cluster_member_count = (int *)malloc(k * sizeof(float));
-
-  // initialize cluster centroid coordinate sums to zero
-
-  double ini = omp_get_wtime();
-
-  for (int i = 0; i < k; ++i) {
-    cluster_member_count[i] = 0;
-
-    for (int j = 0; j < dim; ++j) new_cluster_centroid[i * dim + j] = 0;
-  }
-
-  // sum all points
-  // for every point
-  for (int i = 0; i < n; ++i) {
-    // which cluster is it in?
-    int active_cluster = cluster_assignment_index[i];
-    // update count of members in that cluster
-    cluster_member_count[active_cluster]++;
-
-    // sum point coordinates for finding centroid
-    for (int j = 0; j < dim; j++)
-
-      new_cluster_centroid[active_cluster * dim + j] += X[i * dim + j];
-  }
-
-  // now divide each coordinate sum by number of members to find mean/centroid
-  // for each cluster
-  for (int i = 0; i < k; ++i) {
-    if (cluster_member_count[i] == 0) {
-      // printf("WARNING: Empty cluster %d! \n", i);
-      cluster_member_count[i] = 0.00005;
-    }
-    // for each dimension
-    for (int j = 0; j < dim; j++)
-      new_cluster_centroid[i * dim + j] /=
-          cluster_member_count[i];  /// XXXX will divide by zero here for any
-                                    /// empty clusters!
-  }
-  double fin = omp_get_wtime();
-  printf("El tiempo de ejecución de choose all clusters from es %lf\n",
-         fin - ini);
-}
-
-/**
- * get_cluster_member_count the member of each cluster
- * @param int -n: number of rows (points) in the data set to be classified
- * @param int -k: number of clusters to be calculated
- * @param int* - cluster_assignment_index contains the assigned cluster to each
- * point
- * @param int * -cluster_member_count: count members of each cluster
- */
 void get_cluster_member_count(int n, int k, int *cluster_assignment_index,
                               int *cluster_member_count) {
-  // initialize cluster member counts
   for (int i = 0; i < k; i++) cluster_member_count[i] = 0;
-
-  // count members of each cluster
   for (int i = 0; i < n; i++)
     cluster_member_count[cluster_assignment_index[i]]++;
 }
 
-/**
- * Visualize the number of members for all clusters
- *
- */
 void cluster_diag(int dim, int n, int k, float *X,
                   int *cluster_assignment_index, float *cluster_centroid) {
   int *cluster_member_count = (int *)malloc(k * sizeof(int));
@@ -290,143 +169,58 @@ void copy_assignment_array(int n, int *src, int *tgt) {
 
 int assignment_change_count(int n, int a[], int b[]) {
   int change_count = 0;
-
   for (int i = 0; i < n; ++i)
     if (a[i] != b[i]) change_count++;
-
   return change_count;
 }
 
-/**
- * random_init_centroid chooses random prototypes that belong to the dataset.
- *They are points of the dataset.
- *@param float * -: cluster_centro_if: clustes id choosen
- *@param float * -: dataSetMatrix
- *@param int clusters: Number of cluster to be don.
- *@param int rows in number of rows in the dataset; i.e. points
- *@param int columns: number of columns. Point's dimension.
- *@return void
- */
 void random_init_centroid(float *cluster_centro_id, float *dataSetMatrix,
                           int clusters, int rows, int columns) {
-  srand(1);
-
   for (int i = 0; i < clusters; ++i) {
-    int r = rand() % rows;
     for (int j = 0; j < columns; ++j) {
-      cluster_centro_id[i * columns + j] = dataSetMatrix[r * columns + j];
-      // printf("%.6f", dataSetMatrix[r * columns + j]);
-      //  printf ("Los indices son  %d\n", r*columns+j);
+      cluster_centro_id[i * columns + j] =
+          dataSetMatrix[randomOMP[i] * columns + j];
     }
   }
 }
 
-/*
- * This is C source code for a simple implementation of the popular k-means
- * clustering algorithm. It is based on the implementation in Matlab, which was
- * in turn based on GAF Seber, Multivariate Observations, 1964, and H Spath,
- * Cluster Dissection and Analysis: Theory, FORTRAN Programs, Examples.
- * @param int -dim: number of columns (variables) in the data set to be
- * classified
- * @param float * -X: dataset to be classified
- * @param int -n: number of rows (points) in the data set to be classified
- * @param int -k: number of clusters to be calculated
- * @param float * -cluster_centroid: Initial clusters prototypes or centros
- * @param int iterations -: number of iterations
- * @param int * cluster_assignment_final -: Output classitfication
- */
-void kmeans(int dim,                  // dimension of data
-            float *X,                 // pointer to data
-            int n,                    // number of elements
-            int k,                    // number of clusters
-            float *cluster_centroid,  // initial cluster centroids
-            int iterations,           // Nunber of iterations to be performed
-            int *cluster_assignment_final,  // output
-            int mode  // number of threads in the execution
-) {
-  //    printf ("The number of threads is %d\n", mode);
+void kmeans(int dim, float *X, int n, int k, float *cluster_centroid,
+            int iterations, int *cluster_assignment_final, int mode) {
+  omp_set_num_threads(mode);
   float *dist = (float *)malloc(sizeof(float) * n * k);
   int *cluster_assignment_cur = (int *)malloc(sizeof(int) * n);
   int *cluster_assignment_prev = (int *)malloc(sizeof(int) * n);
   float *point_move_score = (float *)malloc(sizeof(float) * n * k);
-  double ini;
-  double fin;
-  double time = 0;
 
   if (!dist || !cluster_assignment_cur || !cluster_assignment_prev ||
       !point_move_score)
     fail("Error allocating dist arrays\n");
 
-  // Initial setup. Assignment Step
   random_init_centroid(cluster_centroid, X, k, n, dim);
   calc_all_distances(dim, n, k, X, cluster_centroid, dist);
   choose_all_clusters_from_distances(dim, n, k, dist, cluster_assignment_cur);
-
   copy_assignment_array(n, cluster_assignment_cur, cluster_assignment_prev);
 
-  // The initial quality is the one obtained from the random election
-  // ini = omp_get_wtime();
   float prev_totD = calc_total_distance(dim, n, k, X, cluster_centroid,
                                         cluster_assignment_cur);
-  // fin = omp_get_wtime();
-  // time += fin - ini;
-
   int numVariations = 0;
-  // UPDATE STEP
-  // for (int batch=0; (batch < iterations) && (numVariations
-  // <MAX_ITER_NO_IMPR); ++batch) {
-
   for (int batch = 0; (batch < iterations); ++batch) {
-    // printf("Batch step: %d \n", batch);
-    // cluster_diag(dim, n, k, X, cluster_assignment_cur, cluster_centroid);
-
-    // update cluster centroids. Update Step
     calc_cluster_centroidsOMP(dim, n, k, X, cluster_assignment_cur,
                               cluster_centroid);
-
-    // ini = omp_get_wtime();
-    // fin = omp_get_wtime();
-    // time += fin - ini;
     float totD = calc_total_distance(dim, n, k, X, cluster_centroid,
                                      cluster_assignment_cur);
-    // fin = omp_get_wtime();
-    // time += fin - ini;
-
-    // see if we've failed to improve
     if (totD >= prev_totD) {
-      // failed to improve - currently solution worse than previous
-      // restore old assignments
       copy_assignment_array(n, cluster_assignment_prev, cluster_assignment_cur);
-
-      // recalc centroids randomly
       random_init_centroid(cluster_centroid, X, k, n, dim);
-      // calc_cluster_centroids(dim, n, k, X, cluster_assignment_cur,
-      // cluster_centroid);
-      // printf("\tNegative progress made on this step - iteration completed
-      // (%.2f) \n", prev_totD-totD); numVariations++; //To implement no
-      // convergence criteria
-    } else {  // We have made some improvements
-      // save previous step
+    } else {
       copy_assignment_array(n, cluster_assignment_cur, cluster_assignment_prev);
-      // move all points to nearest cluster
       calc_all_distances(dim, n, k, X, cluster_centroid, dist);
       choose_all_clusters_from_distances(dim, n, k, dist,
                                          cluster_assignment_cur);
-      // check how many assignments are different
-      // int change_count = assignment_change_count(n, cluster_assignment_cur,
-      // cluster_assignment_prev); printf("\tIn the batch: %d, has changed: %d
-      // element to a different cluster with an improvement of %f \n", batch,
-      // change_count, prev_totD-totD); fflush(stdout);
       prev_totD = totD;
     }
   }
-  // printf("%f\n", time);
-
-  // cluster_diag(dim, n, k, X, cluster_assignment_cur, cluster_centroid);
-
-  // write to output array
   copy_assignment_array(n, cluster_assignment_cur, cluster_assignment_final);
-  printf("Tiempo: %f\n", xtime);
 
   free(dist);
   free(cluster_assignment_cur);

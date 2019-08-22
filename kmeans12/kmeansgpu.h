@@ -6,7 +6,10 @@
 #define OPERTH 4
 #define sqr(x) ((x)*(x))
 
+#include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #ifdef __cplusplus
   extern "C"
 #endif

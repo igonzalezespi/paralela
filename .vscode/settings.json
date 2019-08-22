@@ -1,7 +1,15 @@
 {
   "files.associations": {
     "stdio.h": "c",
-    "*.cu": "cpp"
+    "*.cu": "cpp",
+    "chrono": "cpp",
+    "limits": "cpp",
+    "cmath": "cpp",
+    "typeindex": "cpp",
+    "typeinfo": "cpp",
+    "array": "cpp",
+    "initializer_list": "cpp",
+    "utility": "cpp"
   },
   "files.exclude": {
     ".vscode": true,
