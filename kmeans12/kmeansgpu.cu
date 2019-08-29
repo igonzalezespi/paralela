@@ -82,19 +82,12 @@ float calc_total_distanceCUDA(int dim, int n, int k, float *D_X,
   float H_tot = 0.0f;
   float *D_tot;
   cudaMalloc(&D_tot, sizeof(float));
-  cudaMemcpy(
-    D_tot,
-     &H_tot, 
-     sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(D_tot, &H_tot, sizeof(float), cudaMemcpyHostToDevice);
   // Parecido a blocksalldistances/threadsalldistances pero con una dimensión
   dim3 blocks(512);  // Dividimos "n" en bloques de 512
   dim3 threads((int)((n + 512 - 1) / 512));
   D_calc_total_distanceCUDA<<<blocks, threads>>>(
-      dim,
-       D_X, 
-       D_centroids, 
-       D_cluster_assignment_index, 
-       D_tot);
+      dim, D_X, D_centroids, D_cluster_assignment_index, D_tot);
   cudaMemcpy(&H_tot, &D_tot, sizeof(float), cudaMemcpyDeviceToHost);
 
   return H_tot;
